@@ -1,0 +1,59 @@
+# See: https://taskfile.dev/api/
+
+version: "3"
+
+vars:
+  GOLANGCI_LINT_VERSION: v1.64
+  GOFUMPT_VERSION: v0.7
+env:
+  GOBIN: "{{ .USER_WORKING_DIR }}/bin"
+
+tasks:
+  default:
+    desc: "Run default tasks"
+    cmds:
+      - task: deps
+      - task: test
+      - task: lint
+  deps:
+    desc: "Ensure dependencies are installed and tidy"
+    run: once
+    cmds:
+      - go mod tidy
+  test:
+    desc: "Run unit tests"
+    deps:
+      - deps
+    cmds:
+      - GOPATH=$GOPATH GOBIN={{ .GOBIN }} go clean --testcache
+      - GOPATH=$GOPATH GOBIN={{ .GOBIN }} go test -race `go list ./... | grep -v test | grep -v \/api` -coverprofile=.coverage.out
+      - GOPATH=$GOPATH GOBIN={{ .GOBIN }} go tool cover -func=.coverage.out | tail -n1
+  fmt:
+    desc: "Format the code"
+    deps:
+      - tools
+    cmds:
+      - GOPATH=$GOPATH GOBIN={{ .GOBIN }} gofumpt -l -w .
+
+  lint:
+    desc: "Run linter"
+    deps:
+      - deps
+      - tools
+    cmds:
+      - GOPATH=$GOPATH GOBIN={{ .GOBIN }} golangci-lint run {{ .CLI_ARGS }}
+
+  build:
+    desc: "Build"
+    deps:
+      - deps
+    cmds:
+      - GOPATH=$GOPATH GOBIN={{ .GOBIN }} go build -o ${GOBIN}/miso cmd/main.go
+
+  tools:
+    internal: true
+    run: once
+    cmds:
+      - go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@{{ .GOLANGCI_LINT_VERSION }}
+      - go install -v mvdan.cc/gofumpt@{{ .GOFUMPT_VERSION }}
+
