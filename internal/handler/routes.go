@@ -18,7 +18,7 @@ func (h *Handler) Register(v1 *echo.Group) {
 	})
 
 	mirror := v1.Group("/mirror")
-	mirror.GET("/health", func(c echo.Context) error {
+	mirror.GET("", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, true)
 	})
 
