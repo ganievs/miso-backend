@@ -8,10 +8,14 @@ import (
 	"os/signal"
 	"time"
 
+	"miso/internal/config"
+	"miso/internal/handler"
+	"miso/internal/storage/s3"
+
+	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/labstack/echo-contrib/echoprometheus"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"miso/internal/config"
 )
 
 type Services struct {
@@ -27,9 +31,20 @@ func main() {
 		logger.Error("Could not load config")
 	}
 
+	sdkConfig, err := awsConfig.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		logger.Error("Couldn't load default configuration. Have you set up your AWS account?")
+	}
+	storage := s3.New(config.S3, sdkConfig)
+
 	// Main server
 	mainServer := echo.New()
 	mainServer.HideBanner = true
+	mainServer.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
+		AllowMethods: []string{echo.GET, echo.HEAD, echo.PUT, echo.PATCH, echo.POST, echo.DELETE},
+	}))
 	mainServer.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogStatus:   true,
 		LogURI:      true,
@@ -61,6 +76,11 @@ func main() {
 			Providers: "/v1/providers/",
 		})
 	})
+
+	// Register APIv1 handler
+	v1 := mainServer.Group("/api/v1")
+	h := handler.NewHandler(storage)
+	h.Register(v1)
 
 	// Health Rerver
 	healthServer := echo.New()
