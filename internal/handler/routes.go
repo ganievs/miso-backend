@@ -21,5 +21,4 @@ func (h *Handler) Register(v1 *echo.Group) {
 	mirror.GET("", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, true)
 	})
-
 }

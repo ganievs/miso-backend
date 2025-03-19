@@ -59,11 +59,9 @@ func (s *Storage) Get(key string) ([]byte, error) {
 	}
 
 	return buf.Bytes(), err
-
 }
 
 func (s *Storage) Put(key string, data io.Reader) error {
-
 	if len(key) <= 0 {
 		return nil
 	}
