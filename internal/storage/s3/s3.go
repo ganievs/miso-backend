@@ -16,6 +16,7 @@ import (
 
 type Storage struct {
 	client         *s3.Client
+	presignClient  *s3.PresignClient
 	bucket         string
 	requestTimeout time.Duration
 	downloader     *manager.Downloader
@@ -25,10 +26,11 @@ type Storage struct {
 func New(config config.S3, sdkConfig aws.Config) *Storage {
 	session := s3.NewFromConfig(sdkConfig)
 	return &Storage{
-		client:     session,
-		bucket:     config.Bucket,
-		downloader: manager.NewDownloader(session),
-		uploader:   manager.NewUploader(session),
+		client:        session,
+		presignClient: s3.NewPresignClient(session),
+		bucket:        config.Bucket,
+		downloader:    manager.NewDownloader(session),
+		uploader:      manager.NewUploader(session),
 	}
 }
 
@@ -119,4 +121,25 @@ func (s *Storage) List(path string) ([]string, error) {
 	}
 
 	return objects, err
+}
+
+func (s *Storage) GetPresignedURL(key string) (string, error) {
+	if len(key) <= 0 {
+		return "", nil
+	}
+
+	ctx, cancel := s.requestContext()
+	defer cancel()
+
+	presignResult, err := s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: &s.bucket,
+		Key:    aws.String(key),
+	}, func(opts *s3.PresignOptions) {
+		opts.Expires = time.Duration(10 * time.Minute)
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return presignResult.URL, nil
 }

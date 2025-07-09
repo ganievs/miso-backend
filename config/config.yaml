@@ -5,3 +5,5 @@ app:
   loglevel: "debug"
 metrics:
   port: 9001
+s3:
+  bucket: miso-dev
