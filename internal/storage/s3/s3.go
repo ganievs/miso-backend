@@ -41,7 +41,7 @@ func (s *Storage) requestContext() (context.Context, context.CancelFunc) {
 	return context.Background(), func() {}
 }
 
-func (s *Storage) Get(key string) ([]byte, error) {
+func (s *Storage) GetBuffer(key string) ([]byte, error) {
 	var nsk *types.NoSuchKey
 
 	if len(key) <= 0 {
@@ -61,6 +61,26 @@ func (s *Storage) Get(key string) ([]byte, error) {
 	}
 
 	return buf.Bytes(), err
+}
+
+func (s *Storage) GetStream(key string) (io.ReadCloser, error) {
+	var nsk *types.NoSuchKey
+
+	if len(key) <= 0 {
+		return nil, nil
+	}
+	ctx, cancel := s.requestContext()
+	defer cancel()
+
+	resp, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &s.bucket,
+		Key:    aws.String(key),
+	})
+	if errors.As(err, &nsk) {
+		return nil, nil
+	}
+
+	return resp.Body, err
 }
 
 func (s *Storage) Put(key string, data io.Reader) error {

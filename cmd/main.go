@@ -75,7 +75,7 @@ func main() {
 
 	// Register APIv1 handler
 	v1 := mainServer.Group("/api/v1")
-	h := handler.NewHandler(storage)
+	h := handler.NewHandler(storage, config.S3)
 	h.Register(v1)
 
 	// Health Rerver

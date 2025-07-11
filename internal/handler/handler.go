@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"io"
+	"miso/internal/config"
 	"miso/internal/storage"
 	"net/http"
 	"strings"
@@ -9,7 +11,15 @@ import (
 )
 
 type Handler struct {
-	storage storage.Storage
+	Storage storage.Storage
+	Config  config.S3
+}
+
+func NewHandler(storage storage.Storage, config config.S3) *Handler {
+	return &Handler{
+		Storage: storage,
+		Config:  config,
+	}
 }
 
 func (h *Handler) ListProviderVersions(c echo.Context) error {
@@ -17,7 +27,7 @@ func (h *Handler) ListProviderVersions(c echo.Context) error {
 	typeName := c.Param("type")
 
 	prefix := "providers/" + namespace + "/" + typeName + "/"
-	keys, err := h.storage.List(prefix)
+	keys, err := h.Storage.List(prefix)
 	if err != nil {
 		return err
 	}
@@ -25,7 +35,7 @@ func (h *Handler) ListProviderVersions(c echo.Context) error {
 	versionSet := make(map[string]struct{})
 	for _, key := range keys {
 		version := strings.Split(strings.TrimPrefix(key, prefix), "/")[0]
-		versionSet[version] = struct{}
+		versionSet[version] = struct{}{}
 	}
 
 	versions := []map[string]interface{}{}
@@ -46,7 +56,12 @@ func (h *Handler) DownloadProviderVersion(c echo.Context) error {
 	arch := c.Param("arch")
 
 	key := "providers/" + namespace + "/" + typeName + "/" + version + "/" + os + "/" + arch + "/terraform-provider-" + typeName + "_v" + version
-	downloadURL, err := h.storage.GetPresignedURL(key)
+
+	if h.Config.DownloadMode == "proxy" {
+		return h.proxyDownload(c, key)
+	}
+
+	downloadURL, err := h.Storage.GetPresignedURL(key)
 	if err != nil {
 		return err
 	}
@@ -62,7 +77,7 @@ func (h *Handler) ListModuleVersions(c echo.Context) error {
 	provider := c.Param("provider")
 
 	prefix := "modules/" + namespace + "/" + name + "/" + provider + "/"
-	keys, err := h.storage.List(prefix)
+	keys, err := h.Storage.List(prefix)
 	if err != nil {
 		return err
 	}
@@ -70,7 +85,7 @@ func (h *Handler) ListModuleVersions(c echo.Context) error {
 	versionSet := make(map[string]struct{})
 	for _, key := range keys {
 		version := strings.Split(strings.TrimPrefix(key, prefix), "/")[0]
-		versionSet[version] = struct{}
+		versionSet[version] = struct{}{}
 	}
 
 	versions := []map[string]interface{}{}
@@ -92,11 +107,28 @@ func (h *Handler) DownloadModuleVersion(c echo.Context) error {
 	version := c.Param("version")
 
 	key := "modules/" + namespace + "/" + name + "/" + provider + "/" + version + "/module.zip"
-	downloadURL, err := h.storage.GetPresignedURL(key)
+
+	if h.Config.DownloadMode == "proxy" {
+		return h.proxyDownload(c, key)
+	}
+
+	downloadURL, err := h.Storage.GetPresignedURL(key)
 	if err != nil {
 		return err
 	}
 
-	c.Response().Header().Set("X-Terraform-Get", downloadURL)
-	return c.NoContent(http.StatusNoContent)
+	return c.Redirect(http.StatusFound, downloadURL)
+}
+
+func (h *Handler) proxyDownload(c echo.Context, key string) error {
+	stream, err := h.Storage.GetStream(key)
+	if err != nil {
+		return err
+	}
+	defer stream.Close()
+
+	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEOctetStream)
+	c.Response().WriteHeader(http.StatusOK)
+	_, err = io.Copy(c.Response().Writer, stream)
+	return err
 }
