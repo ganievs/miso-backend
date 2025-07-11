@@ -33,7 +33,7 @@ tasks:
     deps:
       - tools
     cmds:
-      - GOPATH=$GOPATH GOBIN={{ .GOBIN }} gofumpt -l -w .
+      - GOPATH=$GOPATH GOBIN={{ .GOBIN }} ${GOBIN}/gofumpt -l -w .
 
   lint:
     desc: "Run linter"
@@ -41,7 +41,7 @@ tasks:
       - deps
       - tools
     cmds:
-      - GOPATH=$GOPATH GOBIN={{ .GOBIN }} golangci-lint run {{ .CLI_ARGS }}
+      - GOPATH=$GOPATH GOBIN={{ .GOBIN }} ${GOBIN}/golangci-lint run {{ .CLI_ARGS }}
 
   build:
     desc: "Build"
@@ -56,4 +56,3 @@ tasks:
     cmds:
       - go install -v github.com/golangci/golangci-lint/cmd/golangci-lint@{{ .GOLANGCI_LINT_VERSION }}
       - go install -v mvdan.cc/gofumpt@{{ .GOFUMPT_VERSION }}
-
