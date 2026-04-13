@@ -1,5 +1,23 @@
 package provider
 
+type Platform struct {
+	OS   string `json:"os"`
+	Arch string `json:"arch"`
+}
+
+type PlatformArtifact struct {
+	OS       string `json:"os"`
+	Arch     string `json:"arch"`
+	Filename string `json:"filename"`
+	Shasum   string `json:"shasum"`
+}
+
+type VersionMetadata struct {
+	Protocols   []string           `json:"protocols"`
+	Platforms   []PlatformArtifact `json:"platforms"`
+	SigningKeys SigningKeys         `json:"signing_keys"`
+}
+
 type Version struct {
 	Version   string     `json:"version"`
 	Protocols []string   `json:"protocols"`
@@ -8,15 +26,6 @@ type Version struct {
 
 type Metadata struct {
 	Versions []Version `json:"versions"`
-}
-
-type Platform struct {
-	Hashes []string `json:"hashes"`
-	URL    string   `json:"url"`
-}
-
-type Archives struct {
-	Archives map[string]Platform `json:"archives"`
 }
 
 type SigningKeys struct {

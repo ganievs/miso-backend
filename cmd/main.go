@@ -73,9 +73,9 @@ func main() {
 
 	mainServer.Static("/.well-known", "public/.well-known")
 
-	// Register APIv1 handler
-	v1 := mainServer.Group("/api/v1")
-	h := handler.NewHandler(storage, config.S3)
+	// Register v1 handler
+	v1 := mainServer.Group("/v1")
+	h := handler.NewHandler(storage, config.S3, config.App.Secret)
 	h.Register(v1)
 
 	// Health Rerver

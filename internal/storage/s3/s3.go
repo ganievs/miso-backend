@@ -117,8 +117,6 @@ func (s *Storage) Delete(key string) error {
 }
 
 func (s *Storage) List(path string) ([]string, error) {
-	var objects []string
-
 	if len(path) <= 0 {
 		return nil, nil
 	}
@@ -126,21 +124,23 @@ func (s *Storage) List(path string) ([]string, error) {
 	ctx, cancel := s.requestContext()
 	defer cancel()
 
-	listObjectsInput := s3.ListObjectsV2Input{
+	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
 		Bucket: &s.bucket,
 		Prefix: aws.String(path),
+	})
+
+	var objects []string
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range page.Contents {
+			objects = append(objects, aws.ToString(obj.Key))
+		}
 	}
 
-	resp, err := s.client.ListObjectsV2(ctx, &listObjectsInput)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, object := range resp.Contents {
-		objects = append(objects, *object.Key)
-	}
-
-	return objects, err
+	return objects, nil
 }
 
 func (s *Storage) GetPresignedURL(key string) (string, error) {
