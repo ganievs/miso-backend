@@ -22,7 +22,8 @@ type Metrics struct {
 }
 
 type S3 struct {
-	Bucket string `mapstructure:"bucket"`
+	Bucket       string `mapstructure:"bucket"`
+	DownloadMode string `mapstructure:"download_mode"`
 }
 
 func LoadConfig(paths ...string) (*Config, error) {

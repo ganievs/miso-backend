@@ -16,6 +16,7 @@ import (
 
 type Storage struct {
 	client         *s3.Client
+	presignClient  *s3.PresignClient
 	bucket         string
 	requestTimeout time.Duration
 	downloader     *manager.Downloader
@@ -25,10 +26,11 @@ type Storage struct {
 func New(config config.S3, sdkConfig aws.Config) *Storage {
 	session := s3.NewFromConfig(sdkConfig)
 	return &Storage{
-		client:     session,
-		bucket:     config.Bucket,
-		downloader: manager.NewDownloader(session),
-		uploader:   manager.NewUploader(session),
+		client:        session,
+		presignClient: s3.NewPresignClient(session),
+		bucket:        config.Bucket,
+		downloader:    manager.NewDownloader(session),
+		uploader:      manager.NewUploader(session),
 	}
 }
 
@@ -39,7 +41,7 @@ func (s *Storage) requestContext() (context.Context, context.CancelFunc) {
 	return context.Background(), func() {}
 }
 
-func (s *Storage) Get(key string) ([]byte, error) {
+func (s *Storage) GetBuffer(key string) ([]byte, error) {
 	var nsk *types.NoSuchKey
 
 	if len(key) <= 0 {
@@ -59,6 +61,26 @@ func (s *Storage) Get(key string) ([]byte, error) {
 	}
 
 	return buf.Bytes(), err
+}
+
+func (s *Storage) GetStream(key string) (io.ReadCloser, error) {
+	var nsk *types.NoSuchKey
+
+	if len(key) <= 0 {
+		return nil, nil
+	}
+	ctx, cancel := s.requestContext()
+	defer cancel()
+
+	resp, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: &s.bucket,
+		Key:    aws.String(key),
+	})
+	if errors.As(err, &nsk) {
+		return nil, nil
+	}
+
+	return resp.Body, err
 }
 
 func (s *Storage) Put(key string, data io.Reader) error {
@@ -95,8 +117,6 @@ func (s *Storage) Delete(key string) error {
 }
 
 func (s *Storage) List(path string) ([]string, error) {
-	var objects []string
-
 	if len(path) <= 0 {
 		return nil, nil
 	}
@@ -104,19 +124,42 @@ func (s *Storage) List(path string) ([]string, error) {
 	ctx, cancel := s.requestContext()
 	defer cancel()
 
-	listObjectsInput := s3.ListObjectsV2Input{
+	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{
 		Bucket: &s.bucket,
 		Prefix: aws.String(path),
+	})
+
+	var objects []string
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range page.Contents {
+			objects = append(objects, aws.ToString(obj.Key))
+		}
 	}
 
-	resp, err := s.client.ListObjectsV2(ctx, &listObjectsInput)
+	return objects, nil
+}
+
+func (s *Storage) GetPresignedURL(key string) (string, error) {
+	if len(key) <= 0 {
+		return "", nil
+	}
+
+	ctx, cancel := s.requestContext()
+	defer cancel()
+
+	presignResult, err := s.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: &s.bucket,
+		Key:    aws.String(key),
+	}, func(opts *s3.PresignOptions) {
+		opts.Expires = time.Duration(10 * time.Minute)
+	})
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	for _, object := range resp.Contents {
-		objects = append(objects, *object.Key)
-	}
-
-	return objects, err
+	return presignResult.URL, nil
 }

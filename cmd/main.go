@@ -70,16 +70,12 @@ func main() {
 	mainServer.GET("/", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, true)
 	})
-	mainServer.GET("/.well-known/terraform.json", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, &Services{
-			Modules:   "/v1/modules/",
-			Providers: "/v1/providers/",
-		})
-	})
 
-	// Register APIv1 handler
-	v1 := mainServer.Group("/api/v1")
-	h := handler.NewHandler(storage)
+	mainServer.Static("/.well-known", "public/.well-known")
+
+	// Register v1 handler
+	v1 := mainServer.Group("/v1")
+	h := handler.NewHandler(storage, config.S3, config.App.Secret)
 	h.Register(v1)
 
 	// Health Rerver
