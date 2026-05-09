@@ -15,7 +15,7 @@ type PlatformArtifact struct {
 type VersionMetadata struct {
 	Protocols   []string           `json:"protocols"`
 	Platforms   []PlatformArtifact `json:"platforms"`
-	SigningKeys SigningKeys         `json:"signing_keys"`
+	SigningKeys SigningKeys        `json:"signing_keys"`
 }
 
 type Version struct {
