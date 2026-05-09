@@ -125,7 +125,7 @@ func (h *Handler) proxyDownload(c echo.Context, key string) error {
 	if err != nil {
 		return err
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	c.Response().Header().Set(echo.HeaderContentType, echo.MIMEOctetStream)
 	c.Response().WriteHeader(http.StatusOK)

@@ -75,7 +75,7 @@ func main() {
 
 	// Register v1 handler
 	v1 := mainServer.Group("/v1")
-	h := handler.NewHandler(storage, config.S3, config.App.Secret)
+	h := handler.NewHandler(storage, config.S3)
 	h.Register(v1)
 
 	// Health Rerver
