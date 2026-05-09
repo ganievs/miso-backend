@@ -2,10 +2,11 @@ package handler
 
 import (
 	"io"
-	"miso/internal/config"
-	"miso/internal/storage"
 	"net/http"
 	"strings"
+
+	"miso/internal/config"
+	"miso/internal/storage"
 
 	"github.com/labstack/echo/v4"
 )
