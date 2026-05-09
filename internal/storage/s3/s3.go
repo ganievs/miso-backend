@@ -9,7 +9,7 @@ import (
 	"miso/internal/config"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -19,18 +19,16 @@ type Storage struct {
 	presignClient  *s3.PresignClient
 	bucket         string
 	requestTimeout time.Duration
-	downloader     *manager.Downloader
-	uploader       *manager.Uploader
+	transferClient *transfermanager.Client
 }
 
 func New(config config.S3, sdkConfig aws.Config) *Storage {
 	session := s3.NewFromConfig(sdkConfig)
 	return &Storage{
-		client:        session,
-		presignClient: s3.NewPresignClient(session),
-		bucket:        config.Bucket,
-		downloader:    manager.NewDownloader(session),
-		uploader:      manager.NewUploader(session),
+		client:         session,
+		presignClient:  s3.NewPresignClient(session),
+		bucket:         config.Bucket,
+		transferClient: transfermanager.New(session),
 	}
 }
 
@@ -50,17 +48,21 @@ func (s *Storage) GetBuffer(key string) ([]byte, error) {
 	ctx, cancel := s.requestContext()
 	defer cancel()
 
-	buf := manager.NewWriteAtBuffer([]byte{})
-
-	_, err := s.downloader.Download(ctx, buf, &s3.GetObjectInput{
+	out, err := s.transferClient.GetObject(ctx, &transfermanager.GetObjectInput{
 		Bucket: &s.bucket,
 		Key:    aws.String(key),
 	})
 	if errors.As(err, &nsk) {
 		return nil, nil
 	}
+	if err != nil {
+		return nil, err
+	}
+	if c, ok := out.Body.(io.Closer); ok {
+		defer func() { _ = c.Close() }()
+	}
 
-	return buf.Bytes(), err
+	return io.ReadAll(out.Body)
 }
 
 func (s *Storage) GetStream(key string) (io.ReadCloser, error) {
@@ -91,7 +93,7 @@ func (s *Storage) Put(key string, data io.Reader) error {
 	ctx, cancel := s.requestContext()
 	defer cancel()
 
-	_, err := s.uploader.Upload(ctx, &s3.PutObjectInput{
+	_, err := s.transferClient.UploadObject(ctx, &transfermanager.UploadObjectInput{
 		Bucket: &s.bucket,
 		Key:    aws.String(key),
 		Body:   data,
