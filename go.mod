@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/aws/aws-sdk-go-v2 v1.43.2
 	github.com/aws/aws-sdk-go-v2/config v1.32.33
-	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.3.2
+	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.3.7
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.106.2
 	github.com/labstack/echo-contrib v0.50.1
 	github.com/labstack/echo/v4 v4.15.4
